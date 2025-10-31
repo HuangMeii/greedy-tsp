@@ -1,3 +1,5 @@
+const { Children } = require("react");
+
 class Diem {
     ten
     x
@@ -9,7 +11,7 @@ function taoMaTranTrongSo(dsDiem){
     const maTranTrongSo = Array.from({length: n}, ()=> Array(n).fill(0));
 
     for(let i = 0; i < n; i++){
-        const a = dsDiem[i];
+        const a = dsDiem.diem[i];
         for(let j = i + 1; j < n; j++){
             const b = dsDiem[j];
             const dx = (a.x ?? 0) - (b.x ?? 0)
@@ -74,4 +76,76 @@ function thamLam(dsDiem, diemBatDau){
     chuTrinh.push(start);
 
     return { chuTrinh, tongQuangDuong };
+}
+function quyHoachDong(dsDiem, diemBatDau){
+    if(Array.isArray(dsDiem) ||  dsDiem.length === 0){
+        return {chuTrinh: [], tongQuangDuong:0};
+    }
+
+    const soDiem = dsDiem.length;
+    let chiSoBatDau = 0
+
+    if(soDiem === 1){
+        return {chuTrinh:[dsDiem[0], dsDiem[0]], tongQuangDuong: 0};
+    }
+
+    const maTranTrongSo = taoMaTranTrongSo(dsDiem);
+    const soTrangThai = 1 << soDiem
+    const VO_CUNG = Number.POSITIVE_INFINITY
+
+    let bangDP = Array.from({length:soTrangThai}, ()=> new Float64Array(soDiem).fill(VO_CUNG))
+    const cha = Array.from({length:soTrangThai}, ()=> new Int32Array(soDiem).fill(-1))
+
+    bangDP[1<< chiSoBatDau][chiSoBatDau] = 0
+
+    for(let trangThai = 0; trangThai < soTrangThai; trangThai++){
+        if(!(trangThai & (1<<chiSoBatDau))) continue //// chỉ xét các trạng thái chứa điểm bắt đầu
+        for(let chiSoDen = 0; chiSoDen < soDiem; chiSoDen++){
+            if(!(trangThai & (1<< chiSoDen))) continue
+            if(trangThai === (1 << chiSoDen) && chiSoDen !== chiSoBatDau) continue
+            const trangThaiTru = trangThai ^ (1 << chiSoDen)
+            if(trangThaiTru === 0 && chiSoDen === chiSoBatDau) continue
+            if(trangThaiTru === 0) continue
+            for(let chiSoTu = 0; chiSoTu < soDiem; chiSoTu++){
+                if (!(trangThaiTru & (1 << chiSoTu))) continue;
+                const giaTri = bangDP[trangThaiTru][chiSoTu] + maTranTrongSo[chiSoTu][chiSoDen];
+                if (giaTri < bangDP[trangThai][chiSoDen]) {
+                    bangDP[trangThai][chiSoDen] = giaTri;
+                    cha[trangThai][chiSoDen] = chiSoTu;
+                }
+            }
+        }
+    }
+
+    const trangThaiTatCa = (1 << soDiem) - 1;
+    let totNhat = VO_CUNG;
+    let cuoiTotNhat = -1;
+    for (let chiSoDen = 0; chiSoDen < soDiem; chiSoDen++) {
+        if (chiSoDen === chiSoBatDau) continue;
+        const giaTri = bangDP[trangThaiTatCa][chiSoDen] + maTranTrongSo[chiSoDen][chiSoBatDau];
+        if (giaTri < totNhat) {
+            totNhat = giaTri;
+            cuoiTotNhat = chiSoDen;
+        }
+    }
+
+    if (cuoiTotNhat === -1) {
+        return { chuTrinh: [], tongQuangDuong: VO_CUNG };
+    }
+
+    // khôi phục đường đi (các chỉ số)
+    const cacChiSoTruoc = [];
+    let trangThai = trangThaiTatCa;
+    let hienTai = cuoiTotNhat;
+    while (hienTai !== -1 && hienTai !== chiSoBatDau) {
+        cacChiSoTruoc.push(hienTai);
+        const p = cha[trangThai][hienTai];
+        trangThai ^= (1 << hienTai);
+        hienTai = p;
+    }
+    cacChiSoTruoc.reverse();
+
+    const chuTrinh = [dsDiem[chiSoBatDau], ...cacChiSoTruoc.map(i => dsDiem[i]), dsDiem[chiSoBatDau]];
+
+    return { chuTrinh, tongQuangDuong: totNhat };
 }
