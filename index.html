@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <title>Giao diện TSP - Tham lam</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; margin: 12px; display: flex; gap: 12px; }
+        #canvasWrap { border: 1px solid #ccc; position: relative; }
+        canvas { background: #fff; display: block; cursor: crosshair; }
+        #controls { width: 320px; }
+        .btn { padding: 8px 12px; margin: 6px 4px 6px 0; cursor: pointer; }
+        #pointsList { max-height: 300px; overflow:auto; border:1px solid #ddd; padding:6px; margin-top:6px; }
+        .pointItem { font-size: 13px; padding: 2px 0; }
+        label { display:block; margin-top:8px; font-weight:600; }
+        input[type=number] { width:80px; }
+    </style>
+</head>
+<body>
+    <div id="canvasWrap">
+        <canvas id="map" width="900" height="600"></canvas>
+    </div>
+
+    <div id="controls">
+        <h3>Giao diện TSP (tham lam)</h3>
+
+        <div>
+            <button id="btnRun" class="btn">Chạy tham lam</button>
+            <button id="btnClear" class="btn">Xóa tất cả</button>
+            <button id="btnRandom" class="btn">Tạo ngẫu nhiên</button>
+        </div>
+
+        <label>Chọn điểm bắt đầu (hoặc để trống dùng điểm đầu thêm)</label>
+        <select id="startSelect">
+            <option value="">-- (mặc định) --</option>
+        </select>
+
+        <label>Thông tin</label>
+        <div id="info">Số điểm: 0 — Tổng quãng đường: 0</div>
+
+        <label>Danh sách điểm (click vào canvas để thêm)</label>
+        <div id="pointsList"></div>
+    </div>
+
+    <script src="./thamlam.js"></script>
+    <script>
+        // Kịch bản giao diện sử dụng các hàm trong hm.js
+        const canvas = document.getElementById('map');
+        const ctx = canvas.getContext('2d');
+        const pointsListEl = document.getElementById('pointsList');
+        const infoEl = document.getElementById('info');
+        const startSelect = document.getElementById('startSelect');
+
+        let points = []; // mỗi điểm: {ten, x, y}
+
+        function renderPoints(path = []) {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+
+            // nếu có path, vẽ đường
+            if (path && path.length > 1) {
+                ctx.beginPath();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#0077cc';
+                for (let i = 0; i < path.length; i++) {
+                    const p = path[i];
+                    if (i === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+            }
+
+            // vẽ điểm
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                ctx.beginPath();
+                ctx.fillStyle = '#ff3333';
+                ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.fillText((p.ten ?? i), p.x + 8, p.y - 8);
+            }
+        }
+
+        function refreshUI(path = [], total = 0) {
+            // points list
+            pointsListEl.innerHTML = '';
+            startSelect.innerHTML = '<option value="">-- (mặc định) --</option>';
+            for (let i = 0; i < points.length; i++) {
+                const p = points[i];
+                const div = document.createElement('div');
+                div.className = 'pointItem';
+                div.textContent = `${i}: ${p.ten ?? ''} (x=${p.x.toFixed(1)}, y=${p.y.toFixed(1)})`;
+                div.onclick = () => {
+                    // set as start when clicked
+                    startSelect.value = i;
+                };
+                pointsListEl.appendChild(div);
+
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `#${i} ${p.ten ?? ''}`;
+                startSelect.appendChild(opt);
+            }
+
+            infoEl.textContent = `Số điểm: ${points.length} — Tổng quãng đường: ${total.toFixed(3)}`;
+
+            renderPoints(path);
+        }
+
+        // thêm điểm từ click canvas
+        canvas.addEventListener('click', (ev) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = ev.clientX - rect.left;
+            const y = ev.clientY - rect.top;
+            const p = { ten: `P${points.length}`, x, y };
+            points.push(p);
+            refreshUI([], 0);
+        });
+
+        // nút xóa
+        document.getElementById('btnClear').addEventListener('click', () => {
+            points = [];
+            refreshUI([], 0);
+        });
+
+        // nút random
+        document.getElementById('btnRandom').addEventListener('click', () => {
+            points = [];
+            const n = parseInt(prompt('Số điểm ngẫu nhiên:', '10')) || 10;
+            for (let i = 0; i < n; i++) {
+                points.push({
+                    ten: `P${i}`,
+                    x: Math.random()*(canvas.width-40)+20,
+                    y: Math.random()*(canvas.height-40)+20
+                });
+            }
+            refreshUI([], 0);
+        });
+
+        // chạy tham lam sử dụng hàm thamLam từ hm.js
+        document.getElementById('btnRun').addEventListener('click', () => {
+            if (points.length === 0) { alert('Chưa có điểm'); return; }
+
+            const startIdx = startSelect.value === '' ? null : parseInt(startSelect.value);
+            const start = startIdx == null ? null : points[startIdx];
+
+            // thamLam trả về { chuTrinh, tongQuangDuong }
+            const result = thamLam(points, start);
+            // chuTrinh là mảng điểm theo lượt (thamLam dùng chính các đối tượng)
+            const path = result.chuTrinh || [];
+            refreshUI(path, result.tongQuangDuong || 0);
+        });
+
+        // khởi tạo hiển thị
+        refreshUI([], 0);
+    </script>
+</body>
+</html>
