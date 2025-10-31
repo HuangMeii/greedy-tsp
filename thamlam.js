@@ -11,7 +11,7 @@ function taoMaTranTrongSo(dsDiem){
     const maTranTrongSo = Array.from({length: n}, ()=> Array(n).fill(0));
 
     for(let i = 0; i < n; i++){
-        const a = dsDiem.diem[i];
+        const a = dsDiem[i];
         for(let j = i + 1; j < n; j++){
             const b = dsDiem[j];
             const dx = (a.x ?? 0) - (b.x ?? 0)
